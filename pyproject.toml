@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "pexels-api"
+version = "0.1.2"
+description = ""
+authors = ["atosz33 <attilakis33@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2.7.1"
+backoff = "^2.2.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

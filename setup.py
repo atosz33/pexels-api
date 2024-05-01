@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="Pexels API",
+    name="pexels-api",
     version="1.0.0",
     author="Attila Kis",
     author_email="attilakis33@gmail.com",

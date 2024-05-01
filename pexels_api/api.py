@@ -1,9 +1,10 @@
 import requests
+import backoff
 from typing import Optional
 from enum import Enum 
 
 
-from models.response import Response, Photo, RateLimitInfo
+from pexels_api.models.response import Response, Photo, RateLimitInfo
 
 from typing import Union, Optional
 
@@ -80,18 +81,22 @@ class PexelsAPI:
         self.remaining_requests_by_hour = hourly_rate_limit
 
     def get_photo_by_id(self, photo_id: int):
-        response = requests.get(f"{self.URL}/photos/{photo_id}", headers=self.headers)
-        response.raise_for_status()
+        response = requests.get(f"{self.URL}/photos/{photo_id}", headers=self.headers, timeout=60)
 
         return Photo(**response.json())
+
+    @backoff.on_exception(backoff.expo, requests.exceptions.RequestException, max_tries=5)
+    def _make_request(self, method, url, payload):
+        response = requests.request(method, url, payload, headers=self.headers, timeout=60)
+        response.raise_for_status()
+        return response
 
     def get_curated(
         self,
         page: Optional[int] = 1,
         per_page: Optional[int] = 15
     ):
-        response = requests.get(f"{self.URL}/curated?per_page={per_page}&page={page}", headers=self.headers)
-        response.raise_for_status()
+        response = self._make_request('get', f"{self.URL}/curated?per_page={per_page}&page={page}")
 
         response_json = response.json()
 
@@ -129,13 +134,18 @@ class PexelsAPI:
             request_url += f"&locale={locale.value}"
 
 
-        response = requests.get(request_url, headers=self.headers)
-        rate_limit_info = RateLimitInfo(
-            limit=int(response.headers['X-Ratelimit-Limit']),
-            remaining=int(response.headers['X-Ratelimit-Remaining']),
-            reset=int(response.headers['X-Ratelimit-Reset'])
-        )
-        print(rate_limit_info)
+        response = self._make_request('get', request_url)
+        try:
+            rate_limit_info = RateLimitInfo(
+                limit=int(response.headers['X-Ratelimit-Limit']),
+                remaining=int(response.headers['X-Ratelimit-Remaining']),
+                reset=int(response.headers['X-Ratelimit-Reset'])
+            )
+        except Exception as e:
+            print(response.content)
+            print(response.status_code)
+            print(response.headers)
+
         response_json = response.json()
 
         parsed_response = Response(
@@ -147,9 +157,4 @@ class PexelsAPI:
             next_page=response_json.get('next_page')
         )
 
-        self.remaining_requests_by_hour=self.remaining_requests_by_hour-1
-
-        
-
-PexelsAPI("LgjfaviQv6US0uYs2q5y8JQnIUn44IoK3SKNazPbqxJ2TC1yezcbEYlO").get_curated()
-
+        return parsed_response
